@@ -7,10 +7,10 @@
 </head>
 <body>
   <div id="auth">
-    <h2>ログイン / アカウント作成</h2>
+    <h2>アカウント作成 / ログイン</h2>
     <input id="user-id" placeholder="ID" />
     <input id="user-pass" type="password" placeholder="パスワード" />
-    <button onclick="login()">ログイン</button>
+    <button onclick="login()">ログイン / アカウント作成</button>
   </div>
 
   <div id="game" style="display: none;">
@@ -19,11 +19,34 @@
     <button onclick="claimWork()">💼 workする</button>
     <div id="cooldown"></div>
     <hr />
+
     <div id="blackjack">
       <h3>ブラックジャック</h3>
+      <label for="bet">掛け金を選択:</label>
+      <select id="bet">
+        <option value="100">¥100</option>
+        <option value="200">¥200</option>
+        <option value="500">¥500</option>
+        <option value="1000">¥1000</option>
+        <option value="2000">¥2000</option>
+      </select>
       <button onclick="startGame()">ゲーム開始</button>
-      <div id="player-cards" class="card-row"></div>
-      <div id="cpu-cards" class="card-row"></div>
+
+      <div>
+        <h4>CPUのカード</h4>
+        <div id="cpu-cards" class="card-row"></div>
+      </div>
+      <div>
+        <h4>あなたのカード</h4>
+        <div id="player-cards" class="card-row"></div>
+      </div>
+
+      <div id="actions" style="display:none;">
+        <button onclick="hit()">ヒット</button>
+        <button onclick="stand()">スタンド</button>
+      </div>
+
+      <div id="result" style="margin-top: 15px; font-size: 1.2rem;"></div>
     </div>
   </div>
 
