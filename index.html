@@ -1,43 +1,109 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>ブラックジャック - GitHub版</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <title>ブラックジャック</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #222;
+      color: white;
+    }
+
+    input, button {
+      padding: 8px;
+      margin: 5px;
+    }
+
+    select {
+      padding: 5px;
+    }
+
+    .card-row {
+      display: flex;
+      gap: 10px;
+      min-height: 120px;
+      margin-top: 10px;
+    }
+
+    .card {
+      width: 80px;
+      height: 120px;
+      background: white;
+      border-radius: 10px;
+      color: black;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 8px;
+      font-weight: bold;
+      font-size: 1.2rem;
+      opacity: 0;
+      animation: slideIn 0.5s forwards;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(-40px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    #admin-panel {
+      margin-top: 30px;
+      padding: 15px;
+      background: #333;
+      border-radius: 8px;
+    }
+
+    #ranking {
+      margin-top: 20px;
+      background: #111;
+      padding: 10px;
+    }
+  </style>
 </head>
 <body>
+  <h1>ブラックジャック</h1>
+
   <div id="auth">
-    <h2>アカウント作成 / ログイン</h2>
-    <input id="user-id" placeholder="ID" />
-    <input id="user-pass" type="password" placeholder="パスワード" />
+    <input id="user-id" placeholder="ID">
+    <input id="user-pass" placeholder="パスワード" type="password">
     <button onclick="login()">ログイン / アカウント作成</button>
   </div>
 
-  <div id="game" style="display: none;">
-    <h2>ようこそ <span id="username"></span> さん</h2>
-    <div id="balance">所持金: ¥<span id="money">0</span></div>
-    <button onclick="claimWork()">💼 workする</button>
-    <div id="cooldown"></div>
-    <hr />
+  <div id="game" style="display:none;">
+    <div>
+      ようこそ <span id="username"></span> さん｜ 所持金: ¥<span id="money">0</span>
+    </div>
 
-    <div id="blackjack">
-      <h3>ブラックジャック</h3>
-      <label for="bet">掛け金を選択:</label>
-      <select id="bet">
-        <option value="100">¥100</option>
-        <option value="200">¥200</option>
-        <option value="500">¥500</option>
-        <option value="1000">¥1000</option>
-        <option value="2000">¥2000</option>
-      </select>
+    <div>
+      <button onclick="claimWork()">💼 workする</button>
+      <span id="cooldown"></span>
+    </div>
+
+    <hr>
+
+    <div>
+      <h2>ブラックジャック</h2>
+      掛け金：<input id="bet" type="number" value="100" min="1"> 円
       <button onclick="startGame()">ゲーム開始</button>
+      <div id="result" style="margin-top:10px;"></div>
 
       <div>
-        <h4>CPUのカード</h4>
+        <h3>CPU</h3>
+        合計: <span id="cpu-total">0</span>
         <div id="cpu-cards" class="card-row"></div>
       </div>
+
       <div>
-        <h4>あなたのカード</h4>
+        <h3>あなた</h3>
+        合計: <span id="player-total">0</span>
         <div id="player-cards" class="card-row"></div>
       </div>
 
@@ -45,11 +111,238 @@
         <button onclick="hit()">ヒット</button>
         <button onclick="stand()">スタンド</button>
       </div>
+    </div>
 
-      <div id="result" style="margin-top: 15px; font-size: 1.2rem;"></div>
+    <div id="ranking">
+      <h3>🏆 ユーザーランキング</h3>
+      <ul id="ranking-list"></ul>
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <div id="admin-panel" style="display:none;">
+    <h2>管理者モード</h2>
+    <div id="user-list"></div>
+  </div>
+
+  <script>
+    let users = [];
+    let user = null;
+    let deck = [];
+    let playerCards = [];
+    let cpuCards = [];
+    let gameInProgress = false;
+    let betAmount = 0;
+
+    function loadUsers() {
+      const raw = localStorage.getItem("users");
+      users = raw ? JSON.parse(raw) : [];
+    }
+
+    function saveUsers() {
+      localStorage.setItem("users", JSON.stringify(users));
+    }
+
+    function findUserIndex(id) {
+      return users.findIndex(u => u.id === id);
+    }
+
+    function login() {
+      loadUsers();
+      const id = document.getElementById("user-id").value.trim();
+      const pass = document.getElementById("user-pass").value.trim();
+      const idx = findUserIndex(id);
+
+      if (!id || !pass) return alert("IDとパスワードを入力");
+
+      if (idx >= 0) {
+        if (users[idx].pass !== pass) return alert("パスワードが違います");
+        user = users[idx];
+      } else {
+        user = {id, pass, money: 1000, lastWork: 0};
+        users.push(user);
+        saveUsers();
+      }
+
+      document.getElementById("auth").style.display = "none";
+      document.getElementById("game").style.display = "block";
+      document.getElementById("username").textContent = user.id;
+      updateMoney();
+      checkCooldown();
+      renderRanking();
+
+      if (user.id === "asahara" && user.pass === "asahara.sh.6") {
+        showAdminPanel();
+      }
+    }
+
+    function updateMoney() {
+      document.getElementById("money").textContent = user.money;
+      const idx = findUserIndex(user.id);
+      users[idx].money = user.money;
+      saveUsers();
+      renderRanking();
+    }
+
+    function claimWork() {
+      const now = Date.now();
+      if (now - user.lastWork < 3600000) {
+        alert("1時間に1回のみ実行可能");
+        return;
+      }
+      const reward = Math.floor(Math.random() * 4800) + 200;
+      user.money += reward;
+      user.lastWork = now;
+      updateMoney();
+      alert(`¥${reward} 獲得！`);
+      checkCooldown();
+    }
+
+    function checkCooldown() {
+      const now = Date.now();
+      const rem = 3600000 - (now - user.lastWork);
+      document.getElementById("cooldown").textContent = rem > 0 ? `次のworkまで ${Math.floor(rem / 60000)}分` : "";
+    }
+
+    function createDeck() {
+      const suits = ["♠", "♥", "♦", "♣"];
+      const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+      let d = [];
+      for (let s of suits) for (let v of values) d.push({suit: s, value: v});
+      return d;
+    }
+
+    function shuffle(deck) {
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+      return deck;
+    }
+
+    function calculatePoints(cards) {
+      let sum = 0, ace = 0;
+      for (let c of cards) {
+        if (c.value === "A") { ace++; sum += 11; }
+        else if (["J", "Q", "K"].includes(c.value)) sum += 10;
+        else sum += Number(c.value);
+      }
+      while (sum > 21 && ace) { sum -= 10; ace--; }
+      return sum;
+    }
+
+    function renderCards(cards, containerId, totalId) {
+      const cont = document.getElementById(containerId);
+      cont.innerHTML = "";
+      cards.forEach((card, i) => {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.style.animationDelay = `${i * 0.1}s`;
+        div.innerHTML = `<div>${card.value}</div><div style="text-align:center">${card.suit}</div><div style="text-align:right">${card.value}</div>`;
+        cont.appendChild(div);
+      });
+      if (totalId) document.getElementById(totalId).textContent = calculatePoints(cards);
+    }
+
+    function startGame() {
+      if (gameInProgress) return;
+      betAmount = parseInt(document.getElementById("bet").value);
+      if (isNaN(betAmount) || betAmount < 1) return alert("正しい掛け金を入力");
+      if (betAmount > user.money) return alert("所持金が不足");
+
+      user.money -= betAmount;
+      updateMoney();
+      deck = shuffle(createDeck());
+      playerCards = [deck.pop(), deck.pop()];
+      cpuCards = [deck.pop(), deck.pop()];
+      renderCards(playerCards, "player-cards", "player-total");
+      renderCards([cpuCards[0], {suit:"?",value:"?"}], "cpu-cards", "cpu-total");
+      gameInProgress = true;
+      document.getElementById("result").textContent = "";
+      document.getElementById("actions").style.display = "block";
+    }
+
+    function hit() {
+      if (!gameInProgress) return;
+      playerCards.push(deck.pop());
+      renderCards(playerCards, "player-cards", "player-total");
+      const total = calculatePoints(playerCards);
+      if (total > 21) endGame("bust");
+    }
+
+    function stand() {
+      document.getElementById("actions").style.display = "none";
+      while (calculatePoints(cpuCards) < 17) cpuCards.push(deck.pop());
+      renderCards(cpuCards, "cpu-cards", "cpu-total");
+      endGame("end");
+    }
+
+    function endGame(reason) {
+      const p = calculatePoints(playerCards);
+      const c = calculatePoints(cpuCards);
+      let msg = "";
+
+      if (reason === "bust" || p > 21) msg = "バースト！CPUの勝ち";
+      else if (c > 21 || p > c) {
+        msg = "勝ち！";
+        user.money += betAmount * 2;
+      } else if (p === c) {
+        msg = "引き分け";
+        user.money += betAmount;
+      } else msg = "負け！";
+
+      updateMoney();
+      document.getElementById("result").textContent = msg;
+      gameInProgress = false;
+    }
+
+    function showAdminPanel() {
+      document.getElementById("admin-panel").style.display = "block";
+      renderUserList();
+    }
+
+    function renderUserList() {
+      const cont = document.getElementById("user-list");
+      cont.innerHTML = "";
+      users.forEach((u, i) => {
+        const d = document.createElement("div");
+        d.innerHTML = `
+          <b>${u.id}</b>：¥<input id="m-${i}" value="${u.money}" style="width:60px;">
+          <button onclick="editMoney(${i})">更新</button>
+          <button onclick="deleteUser(${i})" style="color:red;">削除</button>
+        `;
+        cont.appendChild(d);
+      });
+    }
+
+    function editMoney(i) {
+      let val = parseInt(document.getElementById(`m-${i}`).value);
+      if (isNaN(val)) return alert("数値を入力");
+      users[i].money = val;
+      saveUsers();
+      if (users[i].id === user.id) {
+        user.money = val;
+        updateMoney();
+      }
+      renderUserList();
+    }
+
+    function deleteUser(i) {
+      if (!confirm("削除しますか？")) return;
+      users.splice(i, 1);
+      saveUsers();
+      renderUserList();
+    }
+
+    function renderRanking() {
+      const ul = document.getElementById("ranking-list");
+      ul.innerHTML = "";
+      const top = [...users].sort((a,b)=>b.money-a.money).slice(0, 5);
+      top.forEach(u => {
+        const li = document.createElement("li");
+        li.textContent = `${u.id}：¥${u.money}`;
+        ul.appendChild(li);
+      });
+    }
+  </script>
 </body>
 </html>
