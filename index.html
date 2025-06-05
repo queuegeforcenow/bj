@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>ブラックジャック - GitHub版</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="auth">
+    <h2>ログイン / アカウント作成</h2>
+    <input id="user-id" placeholder="ID" />
+    <input id="user-pass" type="password" placeholder="パスワード" />
+    <button onclick="login()">ログイン</button>
+  </div>
+
+  <div id="game" style="display: none;">
+    <h2>ようこそ <span id="username"></span> さん</h2>
+    <div id="balance">所持金: ¥<span id="money">0</span></div>
+    <button onclick="claimWork()">💼 workする</button>
+    <div id="cooldown"></div>
+    <hr />
+    <div id="blackjack">
+      <h3>ブラックジャック</h3>
+      <button onclick="startGame()">ゲーム開始</button>
+      <div id="player-cards" class="card-row"></div>
+      <div id="cpu-cards" class="card-row"></div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
